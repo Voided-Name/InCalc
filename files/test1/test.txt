@@ -1,0 +1,12 @@
+>>> what = 1
+added variable
+>>> what
+1
+>>> what + 1
+ERR001 - Invalid Number of Operands/Operators
+>>> what + 1
+ERR001 - Invalid Number of Operands/Operators
+>>> what + 2
+ERR001 - Invalid Number of Operands/Operators
+>>> quit
+(Error)
