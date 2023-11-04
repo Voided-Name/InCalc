@@ -30,6 +30,8 @@ void enter_to_continue()
     {
       break;
     }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << endl;
   }
 }
 void clear_screen()
@@ -203,7 +205,7 @@ string password_reg()
     }
     cin.clear();
     cout << endl
-         << "Invalid Input! Please Try Again" << endl;
+         << "Invalid Input! Please Try Again (no uppercase letter and/or no number)" << endl;
   }
 
   cout << endl;
@@ -367,6 +369,68 @@ vector<vector<string>> get_dir_files_names(vector<string> filenames)
 }
 // menu
 string eval(string inpt);
+vector<string> get_equations(vector<string> stream)
+{
+  int index_del = 0;
+  if (stream[0] == "---")
+  {
+    for (int x = 1; x < stream.size(); x++)
+    {
+      index_del++;
+      if (stream[x] == "---")
+      {
+        break;
+      }
+    }
+    stream.erase(stream.begin() + 0, stream.begin() + index_del + 1);
+  }
+
+  stream.insert(stream.begin(), "---");
+  for (const auto &x : variables)
+  {
+    stream.insert(stream.begin(), x.first + ";" + x.second);
+  }
+  stream.insert(stream.begin(), "---");
+
+  return stream;
+}
+void variables_analysis(vector<string> stream)
+{
+  bool split = false;
+  string first_val, second_val;
+  if (stream[0] == "---")
+  {
+    for (int x = 1; x < stream.size(); x++)
+    {
+      if (stream[x] == "---")
+      {
+        break;
+      }
+      else
+      {
+        for (int y = 0; y < stream[x].length(); y++)
+        {
+          if (stream[x][y] == ';')
+          {
+            split = true;
+          }
+          else if (!split)
+          {
+            first_val = first_val + stream[x][y];
+          }
+          else if (split)
+          {
+            second_val = second_val + stream[x][y];
+          }
+        }
+        variables.insert({first_val, second_val});
+        first_val = "";
+        second_val = "";
+        split = false;
+      }
+    }
+  }
+}
 void open_file(string username, string file_topen)
 {
   fs::path p = fs::current_path();
@@ -384,13 +448,18 @@ void open_file(string username, string file_topen)
     {
       // Write each line to the output file
       cout << line << "\n";
+      stream.push_back(line);
     }
   }
   input.close();
 
-  ofstream output_2(p / file_topen, ios::app);
+  if (!empty(stream))
+  {
+    variables_analysis(stream);
+  }
 
   cout << "\n";
+  cout << "<InCalc>\n\n";
   while (true)
   {
     cout << ">>> ";
@@ -415,6 +484,13 @@ void open_file(string username, string file_topen)
     }
   }
 
+  if (empty(stream))
+  {
+    return;
+  }
+  stream = get_equations(stream);
+
+  ofstream output_2(p / file_topen);
   for (int x = 0; x < stream.size(); x++)
   {
     output_2 << stream[x] << endl;
@@ -471,6 +547,7 @@ string menu_loop_reader()
 void menu_file_sel(string username)
 {
   vector<string> filenames;
+  bool invalid_input = false;
 
   filenames = scan_files(username);
 
@@ -489,6 +566,12 @@ void menu_file_sel(string username)
     if (empty(dir) && empty(file))
     {
       cout << "No Directory or Files (press 'a' to add a file or 'm' to create a directory)" << endl;
+      cout << "\n - UP and DOWN arrow keys to navigate\n - ENTER -> enter file or directory\n - 'a' -> add file \n - 'd' -> delete file\n - 'm' -> make directory\n - 'q' -> quit or escape\n";
+    }
+    else if (invalid_input)
+    {
+      invalid_input = false;
+      cout << "\n - UP and DOWN arrow keys to navigate\n - ENTER -> enter file or directory\n - 'a' -> add file \n - 'd' -> delete file\n - 'm' -> make directory\n - 'q' -> quit or escape\n";
     }
     for (int x = 0; x < dir.size(); x++)
     {
@@ -519,9 +602,6 @@ void menu_file_sel(string username)
       cout << file[x] << endl;
       y++;
     }
-    cout << "Use the UP and DOWN arrow keys to navigate and the ENTER and 'q' "
-            "to enter and leave directories and files"
-         << endl;
     loop_read = menu_loop_reader();
     if (loop_read == "UP")
     {
@@ -618,6 +698,10 @@ void menu_file_sel(string username)
     {
       return;
     }
+    else
+    {
+      invalid_input = true;
+    }
     if (loop_reader_num == dir.size() + file.size())
     {
       loop_reader_num = 0;
@@ -671,6 +755,7 @@ void loginform()
   {
     cout << "Logged In";
     enter_to_continue();
+    clear_screen();
     menu_file_sel(name);
   }
   enter_to_continue();
@@ -679,7 +764,7 @@ void regform()
 {
   vector<string> users;
   users = scan_users();
-  string name, password;
+  string name, password, password_2;
   char pw_buffer;
   bool has_space = false, username_exists;
 
@@ -704,7 +789,6 @@ void regform()
       if (name == users[x])
       {
         username_exists = true;
-        cout << username_exists;
         cout << "Username is already used! Please use a different username..."
              << endl
              << "type quit() to exit" << endl;
@@ -716,6 +800,17 @@ void regform()
     }
   } while (has_space || username_exists);
   password = password_reg();
+  cout << "Confirm ";
+  password_2 = password_reg();
+
+  if (password != password_2)
+  {
+    cout << "Password does not match!\n";
+    enter_to_continue();
+    return;
+  }
+
+  cout << "\nRegistered " << name << "\n";
 
   ofstream pw_file("usr/pw.txt", ofstream::app);
   pw_file << encrypt(name) << ";" << encrypt(password) << endl;
@@ -725,7 +820,7 @@ void regform()
 }
 void menu_loop()
 {
-  string log_sign_str[2] = {"1. Login", "2. Sign Up"};
+  string log_sign_str[2] = {"Login", "Sign Up"};
   string arrow_inpt;
 
   int pos = 0;
@@ -938,7 +1033,7 @@ fn_return func_eval(string buffer, int x, string inpt, string valid_func)
   }
 
   fn_ret.answer = answer;
-  fn_ret.index = --x;
+  fn_ret.index = x;
 
   return fn_ret;
 }
@@ -948,13 +1043,25 @@ string analyze(vector<string> buffer, string var_buffer)
   string analyze_buffer;
   for (int x = 0; x < var_buffer.size(); x++)
   {
-    while (is_a_z(var_buffer[x]))
+    if (is_a_z(var_buffer[x]))
     {
-      analyze_buffer += var_buffer[x];
-      x++;
+      while (is_a_z(var_buffer[x]))
+      {
+        analyze_buffer += var_buffer[x];
+        x++;
+      }
+      if (var_buffer[x] == '(')
+      {
+        analyze_buffer = "";
+        continue;
+      }
+      functions.push_back(analyze_buffer);
     }
-    functions.push_back(analyze_buffer);
     analyze_buffer = "";
+  }
+  if (empty(functions))
+  {
+    return "valid";
   }
   for (int x = 0; x < buffer.size(); x++)
   {
@@ -973,6 +1080,7 @@ string analyze(vector<string> buffer, string var_buffer)
           {
             return "ERR006 - Circular equation, an equation is calling itself\n";
           }
+          buffer.pop_back();
         }
       }
     }
@@ -1091,6 +1199,11 @@ vector<vector<string>> get_tokens(string inpt)
       }
       else if (inpt[x] == '=')
       {
+        if (!empty(operands) || !empty(operators))
+        {
+          cout << "Invalid input, do not create variables in the same line as calcuations\n";
+          return {{"invalid"}, {"invalid"}};
+        }
         if (variables.find(buffer) != variables.end())
         {
           for (int y = ++x; y < inpt.length(); y++)
@@ -1108,7 +1221,7 @@ vector<vector<string>> get_tokens(string inpt)
             cout << "Invalid equation\n";
             return {{"invalid"}, {"invalid"}};
           }
-          variables.insert({buffer, var_buffer});
+          variables[buffer] = var_buffer;
           operands.push_back("changed variable");
           operators.push_back("changed variable");
         }
@@ -1143,12 +1256,18 @@ vector<vector<string>> get_tokens(string inpt)
         {
           var_to_oper = variables[buffer];
           var_to_oper = eval(var_to_oper);
+          if (var_to_oper == "(ERROR)")
+          {
+            return {{"invalid"}, {"invalid"}};
+          }
+
           operands.push_back(var_to_oper);
+
           buffer = "";
         }
         else
         {
-          cout << "ERR003 - variable not found";
+          cout << "ERR003 - variable not found '" << buffer << "'\n";
           return {{"invalid"}, {"invalid"}};
         }
       }
@@ -1177,6 +1296,11 @@ vector<vector<string>> get_tokens(string inpt)
       buffer = "par" + buffer;
       operands.push_back(buffer);
       buffer = "";
+    }
+    else
+    {
+      cout << "Invalid symbol " << inpt[x] << "\n";
+      return {{"invalid"}, {"invalid"}};
     }
     x++;
   }
@@ -1345,7 +1469,6 @@ string eval(string inpt)
 }
 int main()
 {
-  variables.insert({"pi", "3.141592653589793"});
   menu_loop();
 
   return 0;
