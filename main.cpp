@@ -245,25 +245,21 @@ vector<string> users_sort(vector<string> filenames)
 
   for (int x = 0; x < filenames.size(); x++)
   {
-    if (filenames[x].length() > 5)
+    users_buffer = "";
+    for (int y = 0; y < filenames[x].length(); y++)
     {
-      users_buffer = "";
-      for (int y = 0; y < filenames[x].length() - 5; y++)
+      if (filenames[x][y] == ' ' || filenames[x][y] == '\\' ||
+          filenames[x][y] == 0)
       {
-        char z = filenames[x][y + 6];
-        if (filenames[x][y + 6] == ' ' || filenames[x][y + 6] == '\\' ||
-            filenames[x][y + 6] == 0)
-        {
-          break;
-        }
-        users_buffer += filenames[x][y + 6];
+        break;
       }
-      if (string(users_buffer) != string(prev_buffer))
-      {
-        users.push_back(users_buffer);
-      }
-      prev_buffer = users_buffer;
+      users_buffer += filenames[x][y];
     }
+    if (string(users_buffer) != string(prev_buffer))
+    {
+      users.push_back(users_buffer);
+    }
+    prev_buffer = users_buffer;
   }
 
   int y = 0;
@@ -272,28 +268,17 @@ vector<string> users_sort(vector<string> filenames)
 }
 vector<string> scan_users()
 {
-  fs::path p = fs::current_path();
-  vector<string> filenames, filenames_files, users;
-  string buffer, files_lit_str = "files";
-
-  for (const auto &entry : fs::recursive_directory_iterator(p))
+  vector<string> filenames, users;
+  string buffer;
+  fs::path p = fs::current_path() / "files";
+  for (const auto &entry : fs::directory_iterator(p))
   {
     buffer = entry.path().string();
     filenames.push_back(buffer.substr(p.string().length() + 1));
   }
+  // users = users_sort(filenames);
 
-  for (int x = 0; x < filenames.size(); x++)
-  {
-    if (filenames[x].substr(0, 5) != "files")
-    {
-      filenames.erase(filenames.begin() + x);
-      x--;
-    }
-  }
-
-  users = users_sort(filenames);
-
-  return users;
+  return filenames;
 }
 vector<string> scan_files(string username)
 {
@@ -468,19 +453,27 @@ void open_file(string username, string file_topen)
     {
       break;
     }
-    stream.push_back(">>> " + inpt_stream);
-    oupt_stream = eval(inpt_stream);
-
-    if (oupt_stream.find('.') != string::npos)
+    else if (inpt_stream.substr(0, 2) == "//")
     {
-      oupt_stream = remove_trailing_zeros(oupt_stream);
-      cout << oupt_stream << endl;
-      stream.push_back(oupt_stream);
+      stream.push_back("[" + inpt_stream.substr(2) + "]");
+      cout << "\ncomment added\n";
     }
     else
     {
-      cout << oupt_stream << endl;
-      stream.push_back(oupt_stream);
+      stream.push_back(">>> " + inpt_stream);
+      oupt_stream = eval(inpt_stream);
+
+      if (oupt_stream.find('.') != string::npos)
+      {
+        oupt_stream = remove_trailing_zeros(oupt_stream);
+        cout << oupt_stream << endl;
+        stream.push_back(oupt_stream);
+      }
+      else
+      {
+        cout << oupt_stream << endl;
+        stream.push_back(oupt_stream);
+      }
     }
   }
 
@@ -547,7 +540,6 @@ string menu_loop_reader()
 void menu_file_sel(string username)
 {
   vector<string> filenames;
-  bool invalid_input = false;
 
   filenames = scan_files(username);
 
@@ -566,12 +558,6 @@ void menu_file_sel(string username)
     if (empty(dir) && empty(file))
     {
       cout << "No Directory or Files (press 'a' to add a file or 'm' to create a directory)" << endl;
-      cout << "\n - UP and DOWN arrow keys to navigate\n - ENTER -> enter file or directory\n - 'a' -> add file \n - 'd' -> delete file\n - 'm' -> make directory\n - 'q' -> quit or escape\n";
-    }
-    else if (invalid_input)
-    {
-      invalid_input = false;
-      cout << "\n - UP and DOWN arrow keys to navigate\n - ENTER -> enter file or directory\n - 'a' -> add file \n - 'd' -> delete file\n - 'm' -> make directory\n - 'q' -> quit or escape\n";
     }
     for (int x = 0; x < dir.size(); x++)
     {
@@ -602,9 +588,10 @@ void menu_file_sel(string username)
       cout << file[x] << endl;
       y++;
     }
+    cout << "\n - UP and DOWN arrow keys to navigate\n - ENTER -> enter file or directory\n - 'a' -> add file \n - 'd' -> delete file\n - 'm' -> make directory\n - 'q' -> quit or escape\n";
     loop_read = menu_loop_reader();
     if (loop_read == "UP")
-    {
+    { 
       loop_reader_num--;
     }
     else if (loop_read == "DOWN")
@@ -683,6 +670,8 @@ void menu_file_sel(string username)
       {
         cout << "Are you sure you want to delete(y/n) " << marked << ": ";
         cin >> y_n;
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
       }
       if (y_n == 'y')
       {
@@ -697,10 +686,6 @@ void menu_file_sel(string username)
     else if (loop_read == "quit")
     {
       return;
-    }
-    else
-    {
-      invalid_input = true;
     }
     if (loop_reader_num == dir.size() + file.size())
     {
@@ -791,7 +776,7 @@ void regform()
         username_exists = true;
         cout << "Username is already used! Please use a different username..."
              << endl
-             << "type quit() to exit" << endl;
+             << "type quit() to exit if you do not wish to proceed yet" << endl;
       }
     }
     if (name == "quit()")
@@ -817,16 +802,60 @@ void regform()
   name = "files/" + name;
   fs::create_directory(name);
   pw_file.close();
+
+  enter_to_continue();
+}
+void delform()
+{
+  vector<string> users;
+  users = scan_users();
+  string name, password;
+  bool username_exists = false;
+  char choice = 'c';
+
+  cout << "Input Username: ";
+  getline(cin, name);
+
+  password = password_reg();
+
+  for (int x = 0; x < users.size(); x++)
+  {
+    if (name == users[x])
+    {
+      username_exists = true;
+    }
+  }
+
+  if (username_exists)
+  {
+    if (encrypt(password) == get_password(name))
+    {
+      while (choice != 'y' && choice != 'n')
+      {
+        cout << "\n Are you want to delete your account?(y/n): ";
+        cin >> choice;
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+      }
+    }
+  }
+
+  if (choice == 'y')
+  {
+    fs::remove_all("files/" + name);
+    cout << "Account Deleted\n";
+    enter_to_continue();
+  }
 }
 void menu_loop()
 {
-  string log_sign_str[2] = {"Login", "Sign Up"};
+  string log_sign_str[3] = {"Login", "Sign Up", "Delete Account"};
   string arrow_inpt;
 
   int pos = 0;
   while (true)
   {
-    for (int x = 0; x < 2; x++)
+    for (int x = 0; x < 3; x++)
     {
       if (x == pos)
       {
@@ -838,22 +867,27 @@ void menu_loop()
       }
       cout << log_sign_str[x] << std::endl;
     }
-    if (arrow_inpt == "please_warning")
-    {
-      cout << "(Use the Up and Down arrow keys to select and the Enter key to "
-              "proceed | press q to quit)"
-           << endl;
-    }
+    cout << "(Use the Up and Down arrow keys to select and the Enter key to "
+            "proceed | press q to quit)"
+         << endl;
 
     arrow_inpt = menu_loop_reader();
 
     if (arrow_inpt == "UP")
     {
-      pos = 0;
+      pos--;
+      if (pos < 0)
+      {
+        pos = 0;
+      }
     }
     else if (arrow_inpt == "DOWN")
     {
-      pos = 1;
+      pos++;
+      if (pos > 2)
+      {
+        pos = 2;
+      }
     }
     else if (arrow_inpt == "ENTER")
     {
@@ -862,10 +896,14 @@ void menu_loop()
         clear_screen();
         loginform();
       }
-      else
+      else if (pos == 1)
       {
         clear_screen();
         regform();
+      }
+      else
+      {
+        delform();
       }
     }
     else if (arrow_inpt == "quit")
@@ -924,10 +962,10 @@ bool is_a_z(char inpt)
 string is_buffer_valid_func(string inpt)
 {
   bool valid = false;
-  string test[5] = {"pow", "sqrt"};
-  for (int x = 0; x < 5; x++)
+  string test[] = {"pow", "sqrt", "abs", "cbrt", "cos", "sin", "tan", "floor", "ceil", "round", "trunc"};
+  for (const auto &x : test)
   {
-    if (inpt == test[x])
+    if (inpt == x)
     {
       return inpt;
       valid = true;
@@ -950,6 +988,7 @@ fn_return func_eval(string buffer, int x, string inpt, string valid_func)
   fn_return fn_ret;
   vector<string> answer_buffer;
   double answer;
+  bool error002 = false;
 
   fn_ret.error = "";
 
@@ -1000,11 +1039,7 @@ fn_return func_eval(string buffer, int x, string inpt, string valid_func)
   }
   if (valid_func == "pow")
   {
-    if (answer_buffer.size() == 2)
-    {
-      answer = pow(stod(answer_buffer[0]), stod(answer_buffer[1]));
-    }
-    else
+    if (answer_buffer.size() != 2)
     {
       cout << "Invalid Number of Inputs for pow, must be two inputs, Ex: pow(3, 2)\n";
       fn_ret.answer = 0;
@@ -1012,24 +1047,149 @@ fn_return func_eval(string buffer, int x, string inpt, string valid_func)
       fn_ret.error = "ERR002";
       return fn_ret;
     }
+
+    answer = pow(stod(answer_buffer[0]), stod(answer_buffer[1]));
   }
   else if (valid_func == "sqrt")
   {
-    if (answer_buffer.size() == 1)
+    if (answer_buffer.size() != 1)
     {
-      if (stod(answer_buffer[0]) < 0)
-      {
-        cout << "Invalid input for sqrt, sqrt is unable to process negative numbers\n";
-        fn_ret.answer = 0;
-        fn_ret.index = --x;
-        fn_ret.error = "ERR005";
-      }
-      answer = sqrt(stod(answer_buffer[0]));
+      cout << "Invalid number of inputs for sqrt, must be one argument, Ex: sqrt(2)\n";
+
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+
+      return fn_ret;
+    }
+    if (stod(answer_buffer[0]) < 0)
+    {
+      cout << "Invalid input for sqrt, sqrt is unable to process negative numbers\n";
+
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR005";
+
+      return fn_ret;
+    }
+
+    answer = sqrt(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "abs")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for abs, must be one argument, Ex: abs(6)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    if (stod(answer_buffer[0]) < 0)
+    {
+      answer_buffer[0].erase(0, 1);
+      answer = stod(answer_buffer[0]);
     }
     else
     {
-      cout << "Invalid number of inputs for sqrt, must be one input, Ex: sqrt(2)\n";
+      answer = stod(answer_buffer[0]);
     }
+  }
+  else if (valid_func == "cbrt")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for cbrt, must be one argument, Ex: cbrt(2)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = cbrt(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "cos")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for cos, must be one argument, Ex: cos(2)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = cos(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "sin")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for sin, must be one argument, Ex: sin(2)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = sin(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "tan")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for tan, must be one argument, Ex: tan(2)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = tan(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "floor")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for floor, must be one argument, Ex: floor(2.4)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = floor(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "ceil")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for ceil, must be one argument, Ex: ceil(2.6)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = ceil(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "round")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for round, must be one argument, Ex: round(-4.5)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = round(stod(answer_buffer[0]));
+  }
+  else if (valid_func == "trunc")
+  {
+    if (answer_buffer.size() != 1)
+    {
+      cout << "Invalid number of inputs for trunc, must be one argument, Ex: trunc(-5.6)\n";
+      fn_ret.answer = 0;
+      fn_ret.index = --x;
+      fn_ret.error = "ERR002";
+      return fn_ret;
+    }
+    answer = trunc(stod(answer_buffer[0]));
   }
 
   fn_ret.answer = answer;
@@ -1469,6 +1629,7 @@ string eval(string inpt)
 }
 int main()
 {
+  cout << "=================\nWelcome to InCalc\n=================\n\n";
   menu_loop();
 
   return 0;
